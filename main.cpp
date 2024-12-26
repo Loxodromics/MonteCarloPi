@@ -1,6 +1,7 @@
 #include <iostream>
 #include <random>
 #include <iomanip>
+#include <chrono>
 
 double getRandomDouble() {
 	static std::random_device rd;
@@ -14,6 +15,8 @@ int main()
 	uint64_t totalCount = 1;
 	uint64_t insideCircle = 0;
 
+	auto startTime = std::chrono::steady_clock::now();  // Start timing
+
 	while (true) {
 		double x = getRandomDouble();
 		double y = getRandomDouble();
@@ -23,9 +26,14 @@ int main()
 		}
 
 		if (totalCount % 1000000 == 0) {
+			auto currentTime = std::chrono::steady_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime);
+
 			double piEstimate = 4.0 * insideCircle / totalCount;
-			std::cout << std::fixed << std::setprecision(10)  // Set to however many decimals you want
-					  << "~ PI " << piEstimate << " Count: " << totalCount << std::endl;
+			std::cout << std::fixed << std::setprecision(10)
+					  << "~ PI " << piEstimate
+					  << " Count: " << totalCount
+					  << " Time: " << duration.count() << "ms" << std::endl;
 		}
 		++totalCount;
 	}
