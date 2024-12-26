@@ -2,40 +2,64 @@
 #include <random>
 #include <iomanip>
 #include <chrono>
+#include <thread>
+#include <vector>
+#include <atomic>
 
-double getRandomDouble() {
-	static std::random_device rd;
-	static std::mt19937 gen(rd());
-	static std::uniform_real_distribution<double> dis(0.0, 1.0);
-	return dis(gen);
+uint64_t calculatePoints(uint64_t pointsPerThread) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<double> dis(0.0, 1.0);
+
+	uint64_t localInside = 0;
+	for (uint64_t i = 0; i < pointsPerThread; ++i) {
+		double x = dis(gen);
+		double y = dis(gen);
+		if (x * x + y * y < 1.0) {
+			++localInside;
+		}
+	}
+	return localInside;
 }
 
-int main()
-{
-	uint64_t totalCount = 1;
-	uint64_t insideCircle = 0;
+int main() {
+	const uint64_t totalPoints = 10000000000;  // 10 billion points
+	const unsigned numThreads = std::thread::hardware_concurrency();
+	const uint64_t pointsPerThread = totalPoints;
 
-	auto startTime = std::chrono::steady_clock::now();  // Start timing
+	std::vector<std::thread> threads;
+	std::vector<uint64_t> results(numThreads);
 
-	while (true) {
-		double x = getRandomDouble();
-		double y = getRandomDouble();
+	auto startTime = std::chrono::steady_clock::now();
 
-		if (x * x + y * y < 1.0) {
-			++insideCircle;
-		}
-
-		if (totalCount % 1000000 == 0) {
-			auto currentTime = std::chrono::steady_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime);
-
-			double piEstimate = 4.0 * insideCircle / totalCount;
-			std::cout << std::fixed << std::setprecision(10)
-					  << "~ PI " << piEstimate
-					  << " Count: " << totalCount
-					  << " Time: " << duration.count() << "ms" << std::endl;
-		}
-		++totalCount;
+	/// Start threads
+	for (unsigned i = 0; i < numThreads; ++i) {
+		threads.emplace_back([i, pointsPerThread, &results]() {
+			results[i] = calculatePoints(pointsPerThread);
+		});
 	}
+
+	/// Wait for all threads to complete
+	for (auto& thread : threads) {
+		thread.join();
+	}
+
+	/// Sum up results
+	uint64_t totalInside = 0;
+	for (auto count : results) {
+		totalInside += count;
+	}
+
+	auto endTime = std::chrono::steady_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+	double piEstimate = 4.0 * totalInside / (pointsPerThread * numThreads);
+
+	std::cout << std::fixed << std::setprecision(10)
+			  << "~ PI " << piEstimate
+			  << " Count: " << totalPoints
+			  << " Threads: " << numThreads
+			  << " Time: " << duration.count() << "ms" << std::endl;
+
 	return 0;
 }
